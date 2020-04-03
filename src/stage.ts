@@ -1,3 +1,6 @@
+import { Game } from "./game";
+import { PlayerStatus } from "./player";
+
 export enum GameStage {
   BEFORE_START,
   PRE_FLOP,
@@ -10,7 +13,10 @@ export enum GameStage {
 
 class Stage {
   private current: GameStage;
-  constructor() {
+  private game: Game;
+
+  constructor(game: Game) {
+    this.game = game;
     this.current = GameStage.BEFORE_START;
   }
   public getCurrentStage() {
@@ -20,7 +26,16 @@ class Stage {
     switch (this.current) {
       case GameStage.BEFORE_START:
         this.current = GameStage.PRE_FLOP;
-        break;
+        this.game.players.forEach(player => {
+          player.setStatus(PlayerStatus.PLAYING);
+        });
+        const sbPlayerNode = this.game.getSbPlayerNode();
+        const bbPlayerNode = this.game.getBbPlayerNode();
+        sbPlayerNode.player.takeSmallBlind();
+        bbPlayerNode.player.takeBigBlind();
+        const currentPlayerNode = bbPlayerNode.next;
+        currentPlayerNode.player.calAvailableActions(currentPlayerNode);
+        return currentPlayerNode;
       default:
         break;
     }

@@ -1,8 +1,9 @@
 import { expect } from 'chai';
-import { Game, GameStage } from '../src/game';
+import { Game, GameStage, gameFactory } from '../src/game';
 
-const game = new Game({ playerNumber: 2 });
-game.start();
+const game = gameFactory.makeGame();
+const currentPlayerNode = game.start();
+const { smallBlind, bigBlind } = game.options;
 
 describe('#初始化', () => {
   it('游戏配置正常', () => {
@@ -14,13 +15,21 @@ describe('#初始化', () => {
 describe('#翻前', () => {
   it('发牌', () => {
     expect(game.getStage().getCurrentStage()).to.equal(GameStage.PRE_FLOP);
+    // SB 面前 1 块钱
+    expect(game.getSbPlayerNode().player.currentPot).to.equal(smallBlind);
+    // BB 面前 2 块钱
+    expect(game.getBbPlayerNode().player.currentPot).to.equal(bigBlind);
+    // 底池 3 块钱
+    expect(game.pot.mainPot.amount).to.equal(smallBlind + bigBlind);
   });
   it('action', () => {
     // UTG行动，最小下注为1BB，UTG 行动前，其他玩家无法行动
     // UTG 行动后，UTG+1行动前，其他玩家无法行动
     // UTG+1的加注量要为前面2倍，如果不够2倍，则all in
     // 如果此时就剩一位玩家，则游戏结束，底池归这个玩家所有
-    expect(2).to.equal(2);
+    currentPlayerNode.player.call();
+    expect(game.pot.mainPot.amount).to.equal(smallBlind + bigBlind + bigBlind);
+    expect(currentPlayerNode.player.currentPot).to.equal(bigBlind);
   });
   it('all in', () => {
     // all in时要分池，判断此时各个池子数量是否正确

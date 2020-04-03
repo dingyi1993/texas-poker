@@ -1,10 +1,10 @@
 import { expect } from 'chai';
-import { Game, GameStage } from '../src/game';
+import { gameFactory } from '../src/game';
 
 
 describe('#玩家位置名字正常', () => {
   it('小于等于4个', () => {
-    const game = new Game({ playerNumber: 3 });
+    const game = gameFactory.makeGame({ playerNumber: 3 });
     game.start();
     expect(game.players[0].positionName).to.equal('BTN');
     expect(game.players[1].positionName).to.equal('SB');
@@ -12,7 +12,7 @@ describe('#玩家位置名字正常', () => {
     expect(game.players[0].positionName2).to.equal('UTG');
   });
   it('大于4个小于等于6个', () => {
-    const game = new Game({ playerNumber: 5 });
+    const game = gameFactory.makeGame({ playerNumber: 5 });
     game.start();
     expect(game.players[0].positionName).to.equal('BTN');
     expect(game.players[1].positionName).to.equal('SB');
@@ -21,7 +21,7 @@ describe('#玩家位置名字正常', () => {
     expect(game.players[4].positionName).to.equal('CO');
   });
   it('大于6', () => {
-    const game = new Game({ playerNumber: 7 });
+    const game = gameFactory.makeGame({ playerNumber: 7 });
     game.start();
     expect(game.players[0].positionName).to.equal('BTN');
     expect(game.players[1].positionName).to.equal('SB');

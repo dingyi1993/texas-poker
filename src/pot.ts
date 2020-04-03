@@ -1,11 +1,12 @@
 import { Player } from "./player";
 
 class Pot {
-  private amount: number;
+  public amount: number;
   private inPlayers: Map<string, Player>;
 
   constructor() {
     this.amount = 0;
+    this.inPlayers = new Map();
   }
   putAmount(amount: number, player: Player) {
     this.amount += amount;

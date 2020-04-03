@@ -1,20 +1,24 @@
-import { Game } from "./game";
+import { Game, GameStage, PlayerNode } from "./game";
 
 // const PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO', '+N'];
 // const REQUIRED_PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG'];
 
-const enum PlayerType {
-  BTN = 'BTN',
-  SB = 'SB',
-  BB = 'BB',
-  UTG = 'UTG',
-  N = '+N',
-  HJ = 'HJ',
-  CO = 'CO',
+type PlayerAction = 'check' | 'fold' | 'raise' | 'call' | 'all in';
+
+export enum PlayerStatus {
+  PENDING,
+  FOLD,
+  PLAYING,
+  OUT,
+  ALL_IN,
 }
 
 class Player {
   private game: Game;
+  private status: PlayerStatus;
+  private availableActions: PlayerAction[];
+  public currentPot: number;
+  public selfStack: number;
   public positionName: string;
   public positionName2?: string;
   /**
@@ -23,6 +27,13 @@ class Player {
    */
   constructor(game: Game) {
     this.game = game;
+    this.currentPot = 0;
+    this.status = PlayerStatus.PENDING;
+    this.availableActions = [];
+    this.selfStack = 200;
+  }
+  public setStatus(status: PlayerStatus) {
+    this.status = status;
   }
   public setPositionName(positionName: string) {
     if (!this.positionName) {
@@ -46,13 +57,43 @@ class Player {
   //   }
   // }
   public takeSmallBlind() {
-    this.game.pot.mainPot.putAmount(1, this);
+    const { smallBlind } = this.game.options;
+    this.currentPot += smallBlind;
+    this.game.pot.mainPot.putAmount(smallBlind, this);
   }
   public takeBigBlind() {
-    this.game.pot.mainPot.putAmount(2, this);
+    const { bigBlind } = this.game.options;
+    this.currentPot += bigBlind;
+    this.game.pot.mainPot.putAmount(bigBlind, this);
   }
-  public call() {}
-  public check() {}
+  public isPlaying() {
+    return this.status === PlayerStatus.PLAYING;
+  }
+  public calAvailableActions(currentPlayerNode: PlayerNode) {
+    // TODO 这里还需要计算上家弃牌或者 all in 的 case
+    const availableActions: PlayerAction[] = ['fold'];
+    const prevPlayer = currentPlayerNode.prev.player;
+    if (this.selfStack > prevPlayer.currentPot * 2) {
+      availableActions.push('all in', 'raise', 'call');
+    } else if (this.selfStack > prevPlayer.currentPot) {
+      availableActions.push('all in', 'call');
+    } else {
+      availableActions.push('all in');
+    }
+    this.availableActions = availableActions;
+  }
+  public call() {
+    if (this.availableActions.indexOf('call') > -1) {
+      this.currentPot = 2;
+      this.game.pot.mainPot.putAmount(2, this);
+      this.game.goNextPlayer();
+    }
+  }
+  public check() {
+    if (this.availableActions.indexOf('check') > -1) {
+      this.game.goNextPlayer();
+    }
+  }
   public fold() {}
 
 }
