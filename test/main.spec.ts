@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { GameStage, gameFactory } from '../src/game';
 
-const game = gameFactory.makeGame({ playerNumber: 6, buyIn: [600, 400, 600, 200, 200, 200] });
+const game = gameFactory.makeGame({ playerNumber: 6, buyIn: [600, 600, 400, 200, 200, 200] });
 const { smallBlind, bigBlind } = game.options;
 let currentPlayerNode = game.start();
 let mainPot = game.pot.mainPot.amount;
@@ -28,7 +28,7 @@ describe('#翻前', () => {
     // UTG 可能的 action
     expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
     // UTG call
-    let nextPlayerNode = currentPlayerNode.data.call();
+    let nextPlayerNode = currentPlayerNode.data.call(); // UTG
     mainPot += bigBlind;
     // action 后无法再次 action
     expect(currentPlayerNode.data.availableActions).to.deep.equal([]);
@@ -41,7 +41,7 @@ describe('#翻前', () => {
     currentPlayerNode = nextPlayerNode;
 
     expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
-    nextPlayerNode = currentPlayerNode.data.raise(150);
+    nextPlayerNode = currentPlayerNode.data.raise(150); // HJ
     mainPot += 150;
     expect(game.pot.mainPot.amount).to.equal(mainPot);
     expect(currentPlayerNode.data.currentPot).to.equal(150);
@@ -50,26 +50,59 @@ describe('#翻前', () => {
   });
   it('all in', () => {
     expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'call', 'fold']);
-    const nextPlayerNode = currentPlayerNode.data.allIn();
+    const nextPlayerNode = currentPlayerNode.data.allIn(); // CO
     mainPot += 200;
     expect(game.pot.mainPot.amount).to.equal(mainPot);
     expect(currentPlayerNode.data.currentPot).to.equal(200);
     expect(currentPlayerNode.data.selfStack).to.equal(0);
     currentPlayerNode = nextPlayerNode;
   });
-  it('side pot', () => {
+  it('re-raise', () => {
     expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
-    const nextPlayerNode = currentPlayerNode.data.raise(400);
-    mainPot += 200;
-    sidePot1 += 400 - 200;
+    let nextPlayerNode = currentPlayerNode.data.raise(400); // BTN
+    mainPot += 400;
+    // sidePot1 += 400 - 200;
     expect(game.pot.mainPot.amount).to.equal(mainPot);
-    expect(game.pot.sidePot[0].amount).to.equal(sidePot1);
+    // expect(game.pot.sidePot[0].amount).to.equal(sidePot1);
     expect(currentPlayerNode.data.currentPot).to.equal(400);
     expect(currentPlayerNode.data.selfStack).to.equal(200);
     currentPlayerNode = nextPlayerNode;
+
+    nextPlayerNode = currentPlayerNode.data.call(); // SB
+    mainPot += 400 - 1;
+    // sidePot1 += 400 - 200;
+    expect(game.pot.mainPot.amount).to.equal(mainPot);
+    // expect(game.pot.sidePot[0].amount).to.equal(sidePot1);
+    expect(currentPlayerNode.data.currentPot).to.equal(400);
+    expect(currentPlayerNode.data.selfStack).to.equal(200);
+    currentPlayerNode = nextPlayerNode;
+
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'fold']);
+    nextPlayerNode = currentPlayerNode.data.fold(); // BB
+    expect(currentPlayerNode.data.isPlaying()).to.equal(false);
+    currentPlayerNode = nextPlayerNode;
+
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'fold']);
+    nextPlayerNode = currentPlayerNode.data.fold(); // UTG
+    currentPlayerNode = nextPlayerNode;
+
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'fold']);
+    nextPlayerNode = currentPlayerNode.data.allIn(); // HJ
+    currentPlayerNode = nextPlayerNode;
+
+    // expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'fold']);
+    // nextPlayerNode = currentPlayerNode.data.fold(); // CO
+    // currentPlayerNode = nextPlayerNode;
+  });
+  it('side pot', () => {
+    // 计算边池
   });
   it('进入下一轮', () => {
     // 当没有all in的玩家下注量相等时，则进入下一轮
+    // 阶段正确
+    expect(game.getStage().getCurrentStage()).to.equal(GameStage.FLOP);
+    // 先行动的是 SB，还有 200 后手
+    expect(game.getCurrentPlayerNode()).to.equal(game.getSbPlayerNode());
   });
 });
 describe('#翻牌、转牌、河牌', () => {

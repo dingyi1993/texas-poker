@@ -22,7 +22,7 @@ class Stage {
   public getCurrentStage(): GameStage {
     return this.current;
   }
-  public next(): PlayerNode | null {
+  public next(): PlayerNode {
     switch (this.current) {
       case GameStage.BEFORE_START:
         this.current = GameStage.PRE_FLOP;
@@ -36,9 +36,19 @@ class Stage {
         const currentPlayerNode = bbPlayerNode.next;
         currentPlayerNode.data.calAvailableActions(currentPlayerNode, bbPlayerNode);
         return currentPlayerNode;
+      case GameStage.PRE_FLOP:
+        this.current = GameStage.FLOP;
+        let tmpPlayerNode = this.game.getSbPlayerNode();
+        while (tmpPlayerNode.data.selfStack === 0) {
+          tmpPlayerNode = tmpPlayerNode.next;
+        }
+        return tmpPlayerNode;
       default:
-        return null;
+        throw new Error('不正确的 stage');
     }
+  }
+  public isFinished(): boolean {
+    return false;
   }
 }
 

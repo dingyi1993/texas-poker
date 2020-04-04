@@ -65,11 +65,13 @@ class Player {
   public takeSmallBlind(): void {
     const { smallBlind } = this.game.options;
     this.currentPot += smallBlind;
+    this.selfStack -= smallBlind;
     this.game.pot.mainPot.putAmount(smallBlind, this);
   }
   public takeBigBlind(): void {
     const { bigBlind } = this.game.options;
     this.currentPot += bigBlind;
+    this.selfStack -= bigBlind;
     this.game.pot.mainPot.putAmount(bigBlind, this);
   }
   public isPlaying(): boolean {
@@ -99,11 +101,12 @@ class Player {
   public allIn(): PlayerNode {
     if (this.availableActions.indexOf('all in') > -1) {
       const amount = this.selfStack;
-      this.currentPot = amount;
+      this.currentPot += amount;
       this.selfStack = 0;
       this.game.addAllInPlayer(this);
       this.game.pot.mainPot.putAmount(amount, this);
       this.status = PlayerStatus.ALL_IN;
+      this.game.setLastInPlayerNode(this.game.getCurrentPlayerNode());
       return this.game.goNextPlayer();
     } else {
       throw new Error('不合法的行动');
@@ -119,6 +122,7 @@ class Player {
       const amount = prevPlayer.currentPot - this.currentPot;
       this.currentPot = prevPlayer.currentPot;
       this.selfStack -= amount;
+      this.game.setLastInPlayerNode(this.game.getCurrentPlayerNode());
       this.game.pot.mainPot.putAmount(amount, this);
       return this.game.goNextPlayer();
     } else {
@@ -139,18 +143,19 @@ class Player {
       if (amount > this.currentPot + this.selfStack) {
         throw new Error('加注金额超过自己后手，想白嫖吗？');
       }
-      let sidePotAmount = 0;
-      if (prevPlayer.isAllIn()) {
-        sidePotAmount += (amount - prevPlayer.currentPot);
-      }
+      // let sidePotAmount = 0;
+      // if (prevPlayer.isAllIn()) {
+      //   sidePotAmount += (amount - prevPlayer.currentPot);
+      // }
       const addAmount = amount - this.currentPot;
       this.currentPot = amount;
       this.selfStack -= addAmount;
-      this.game.pot.mainPot.putAmount(addAmount - sidePotAmount, this);
-      if (sidePotAmount && this.game.allInPlayers.length > this.game.pot.sidePot.length) {
-        const sidePot = this.game.makeSidePot();
-        sidePot.putAmount(sidePotAmount, this);
-      }
+      this.game.pot.mainPot.putAmount(addAmount, this);
+      // if (sidePotAmount && this.game.allInPlayers.length > this.game.pot.sidePot.length) {
+      //   const sidePot = this.game.makeSidePot();
+      //   sidePot.putAmount(sidePotAmount, this);
+      // }
+      this.game.setLastInPlayerNode(this.game.getCurrentPlayerNode());
       return this.game.goNextPlayer();
     } else {
       throw new Error('不合法的行动');

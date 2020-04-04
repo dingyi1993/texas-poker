@@ -10,7 +10,7 @@ interface GameOptions {
   buyIn: number[];
 }
 
-export type PlayerNode = DoubleLink<Player>;
+export type PlayerNode = DoubleLink<Player>
 
 const REQUIRED_POSITION_TYPE = ['BTN', 'SB', 'BB', 'UTG'];
 const OPTIONAL_POSITION_TYPE = ['CO', 'HJ'];
@@ -20,6 +20,7 @@ class Game {
   private actionChain: PlayerNode;
   private currentPlayerNode: PlayerNode;
   private prevPlayerNode: PlayerNode | null;
+  private lastInPlayerNode: PlayerNode;
 
   public options: GameOptions;
   public players: Player[];
@@ -100,8 +101,15 @@ class Game {
         throw new Error('代码出问题了，不该出现的死循环');
       }
     }
+    if (findNextPlayingNode.data.currentPot >= this.lastInPlayerNode.data.currentPot) {
+      // 当前阶段结束
+      const nextStageFirstPlayerNode = this.stage.next();
+      this.currentPlayerNode = nextStageFirstPlayerNode;
+      this.prevPlayerNode = null;
+      return nextStageFirstPlayerNode;
+    }
     this.currentPlayerNode.data.clearAvailableActions();
-    findNextPlayingNode.data.calAvailableActions(findNextPlayingNode, this.currentPlayerNode);
+    findNextPlayingNode.data.calAvailableActions(findNextPlayingNode, this.lastInPlayerNode);
     this.prevPlayerNode = this.currentPlayerNode;
     this.currentPlayerNode = findNextPlayingNode;
     return findNextPlayingNode;
@@ -123,6 +131,9 @@ class Game {
   }
   public getPrevPlayerNode(): PlayerNode | null {
     return this.prevPlayerNode;
+  }
+  public setLastInPlayerNode(playerNode: PlayerNode): void {
+    this.lastInPlayerNode = playerNode;
   }
 }
 
