@@ -1,4 +1,4 @@
-import { Game, GameStage, PlayerNode } from "./game";
+import { Game, PlayerNode } from "./game";
 
 // const PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO', '+N'];
 // const REQUIRED_PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG'];
@@ -13,10 +13,15 @@ export enum PlayerStatus {
   ALL_IN,
 }
 
+interface PlayerOptions {
+  buyIn: number;
+}
+
 class Player {
   private game: Game;
+  private options: PlayerOptions;
   private status: PlayerStatus;
-  private availableActions: PlayerAction[];
+  public availableActions: PlayerAction[];
   public currentPot: number;
   public selfStack: number;
   public positionName: string;
@@ -25,17 +30,18 @@ class Player {
    *
    * @param game 游戏实例
    */
-  constructor(game: Game) {
+  constructor(game: Game, options: PlayerOptions) {
+    this.options = options;
     this.game = game;
     this.currentPot = 0;
     this.status = PlayerStatus.PENDING;
     this.availableActions = [];
-    this.selfStack = 200;
+    this.selfStack = this.options.buyIn;
   }
-  public setStatus(status: PlayerStatus) {
+  public setStatus(status: PlayerStatus): void {
     this.status = status;
   }
-  public setPositionName(positionName: string) {
+  public setPositionName(positionName: string): void {
     if (!this.positionName) {
       this.positionName = positionName;
     } else if (!this.positionName2) {
@@ -56,45 +62,111 @@ class Player {
   //     }
   //   }
   // }
-  public takeSmallBlind() {
+  public takeSmallBlind(): void {
     const { smallBlind } = this.game.options;
     this.currentPot += smallBlind;
     this.game.pot.mainPot.putAmount(smallBlind, this);
   }
-  public takeBigBlind() {
+  public takeBigBlind(): void {
     const { bigBlind } = this.game.options;
     this.currentPot += bigBlind;
     this.game.pot.mainPot.putAmount(bigBlind, this);
   }
-  public isPlaying() {
+  public isPlaying(): boolean {
     return this.status === PlayerStatus.PLAYING;
   }
-  public calAvailableActions(currentPlayerNode: PlayerNode) {
+  public isAllIn(): boolean {
+    return this.status === PlayerStatus.ALL_IN;
+  }
+  // TODO 这两个参数都能优化
+  public calAvailableActions(currentPlayerNode: PlayerNode, prevPlayerNode: PlayerNode): void {
     // TODO 这里还需要计算上家弃牌或者 all in 的 case
-    const availableActions: PlayerAction[] = ['fold'];
-    const prevPlayer = currentPlayerNode.prev.player;
-    if (this.selfStack > prevPlayer.currentPot * 2) {
+    const availableActions: PlayerAction[] = [];
+    const prevPlayer = prevPlayerNode.data;
+    if (this.selfStack + this.currentPot > prevPlayer.currentPot * 2) {
       availableActions.push('all in', 'raise', 'call');
-    } else if (this.selfStack > prevPlayer.currentPot) {
+    } else if (this.selfStack + this.currentPot > prevPlayer.currentPot) {
       availableActions.push('all in', 'call');
     } else {
       availableActions.push('all in');
     }
+    availableActions.push('fold');
     this.availableActions = availableActions;
   }
-  public call() {
+  public clearAvailableActions(): void {
+    this.availableActions = [];
+  }
+  public allIn(): PlayerNode {
+    if (this.availableActions.indexOf('all in') > -1) {
+      const amount = this.selfStack;
+      this.currentPot = amount;
+      this.selfStack = 0;
+      this.game.addAllInPlayer(this);
+      this.game.pot.mainPot.putAmount(amount, this);
+      this.status = PlayerStatus.ALL_IN;
+      return this.game.goNextPlayer();
+    } else {
+      throw new Error('不合法的行动');
+    }
+  }
+  public call(): PlayerNode {
     if (this.availableActions.indexOf('call') > -1) {
-      this.currentPot = 2;
-      this.game.pot.mainPot.putAmount(2, this);
-      this.game.goNextPlayer();
+      const prevPlayerNode = this.game.getPrevPlayerNode();
+      if (!prevPlayerNode) {
+        throw new Error('call 必须有上一个行动节点');
+      }
+      const prevPlayer = prevPlayerNode.data;
+      const amount = prevPlayer.currentPot - this.currentPot;
+      this.currentPot = prevPlayer.currentPot;
+      this.selfStack -= amount;
+      this.game.pot.mainPot.putAmount(amount, this);
+      return this.game.goNextPlayer();
+    } else {
+      throw new Error('不合法的行动');
     }
   }
-  public check() {
+  public raise(amount: number): PlayerNode {
+    if (this.availableActions.indexOf('raise') > -1) {
+      // TODO 这里获取方法要改
+      const prevPlayerNode = this.game.getPrevPlayerNode();
+      if (!prevPlayerNode) {
+        throw new Error('raise 必须又上一个行动节点');
+      }
+      const prevPlayer = prevPlayerNode.data;
+      if (amount < prevPlayer.currentPot * 2) {
+        throw new Error('mini raise 必须为上一个人的 2 倍');
+      }
+      if (amount > this.currentPot + this.selfStack) {
+        throw new Error('加注金额超过自己后手，想白嫖吗？');
+      }
+      let sidePotAmount = 0;
+      if (prevPlayer.isAllIn()) {
+        sidePotAmount += (amount - prevPlayer.currentPot);
+      }
+      const addAmount = amount - this.currentPot;
+      this.currentPot = amount;
+      this.selfStack -= addAmount;
+      this.game.pot.mainPot.putAmount(addAmount - sidePotAmount, this);
+      if (sidePotAmount && this.game.allInPlayers.length > this.game.pot.sidePot.length) {
+        const sidePot = this.game.makeSidePot();
+        sidePot.putAmount(sidePotAmount, this);
+      }
+      return this.game.goNextPlayer();
+    } else {
+      throw new Error('不合法的行动');
+    }
+  }
+  public check(): PlayerNode {
     if (this.availableActions.indexOf('check') > -1) {
-      this.game.goNextPlayer();
+      return this.game.goNextPlayer();
+    } else {
+      throw new Error('不合法的行动');
     }
   }
-  public fold() {}
+  public fold(): PlayerNode {
+    this.status = PlayerStatus.FOLD;
+    return this.game.goNextPlayer();
+  }
 
 }
 

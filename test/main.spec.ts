@@ -1,9 +1,11 @@
 import { expect } from 'chai';
-import { Game, GameStage, gameFactory } from '../src/game';
+import { GameStage, gameFactory } from '../src/game';
 
-const game = gameFactory.makeGame();
-const currentPlayerNode = game.start();
+const game = gameFactory.makeGame({ playerNumber: 6, buyIn: [600, 400, 600, 200, 200, 200] });
 const { smallBlind, bigBlind } = game.options;
+let currentPlayerNode = game.start();
+let mainPot = game.pot.mainPot.amount;
+let sidePot1 = 0;
 
 describe('#初始化', () => {
   it('游戏配置正常', () => {
@@ -16,23 +18,55 @@ describe('#翻前', () => {
   it('发牌', () => {
     expect(game.getStage().getCurrentStage()).to.equal(GameStage.PRE_FLOP);
     // SB 面前 1 块钱
-    expect(game.getSbPlayerNode().player.currentPot).to.equal(smallBlind);
+    expect(game.getSbPlayerNode().data.currentPot).to.equal(smallBlind);
     // BB 面前 2 块钱
-    expect(game.getBbPlayerNode().player.currentPot).to.equal(bigBlind);
+    expect(game.getBbPlayerNode().data.currentPot).to.equal(bigBlind);
     // 底池 3 块钱
     expect(game.pot.mainPot.amount).to.equal(smallBlind + bigBlind);
   });
   it('action', () => {
-    // UTG行动，最小下注为1BB，UTG 行动前，其他玩家无法行动
-    // UTG 行动后，UTG+1行动前，其他玩家无法行动
-    // UTG+1的加注量要为前面2倍，如果不够2倍，则all in
-    // 如果此时就剩一位玩家，则游戏结束，底池归这个玩家所有
-    currentPlayerNode.player.call();
-    expect(game.pot.mainPot.amount).to.equal(smallBlind + bigBlind + bigBlind);
-    expect(currentPlayerNode.player.currentPot).to.equal(bigBlind);
+    // UTG 可能的 action
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
+    // UTG call
+    let nextPlayerNode = currentPlayerNode.data.call();
+    mainPot += bigBlind;
+    // action 后无法再次 action
+    expect(currentPlayerNode.data.availableActions).to.deep.equal([]);
+    // 主池金额正确
+    expect(game.pot.mainPot.amount).to.equal(mainPot);
+    // 投入筹码数量正确
+    expect(currentPlayerNode.data.currentPot).to.equal(bigBlind);
+    // 后手正确
+    expect(currentPlayerNode.data.selfStack).to.equal(200 - bigBlind);
+    currentPlayerNode = nextPlayerNode;
+
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
+    nextPlayerNode = currentPlayerNode.data.raise(150);
+    mainPot += 150;
+    expect(game.pot.mainPot.amount).to.equal(mainPot);
+    expect(currentPlayerNode.data.currentPot).to.equal(150);
+    expect(currentPlayerNode.data.selfStack).to.equal(50);
+    currentPlayerNode = nextPlayerNode;
   });
   it('all in', () => {
-    // all in时要分池，判断此时各个池子数量是否正确
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'call', 'fold']);
+    const nextPlayerNode = currentPlayerNode.data.allIn();
+    mainPot += 200;
+    expect(game.pot.mainPot.amount).to.equal(mainPot);
+    expect(currentPlayerNode.data.currentPot).to.equal(200);
+    expect(currentPlayerNode.data.selfStack).to.equal(0);
+    currentPlayerNode = nextPlayerNode;
+  });
+  it('side pot', () => {
+    expect(currentPlayerNode.data.availableActions).to.deep.equal(['all in', 'raise', 'call', 'fold']);
+    const nextPlayerNode = currentPlayerNode.data.raise(400);
+    mainPot += 200;
+    sidePot1 += 400 - 200;
+    expect(game.pot.mainPot.amount).to.equal(mainPot);
+    expect(game.pot.sidePot[0].amount).to.equal(sidePot1);
+    expect(currentPlayerNode.data.currentPot).to.equal(400);
+    expect(currentPlayerNode.data.selfStack).to.equal(200);
+    currentPlayerNode = nextPlayerNode;
   });
   it('进入下一轮', () => {
     // 当没有all in的玩家下注量相等时，则进入下一轮
