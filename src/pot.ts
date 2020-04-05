@@ -12,9 +12,13 @@ class Pot {
   public setAverageAmount(averageAmount: number): void {
     this.averageAmount = averageAmount;
   }
-  putAmount(amount: number, player: Player): void {
+  public putAmount(amount: number, player: Player): void {
     this.amount += amount;
     this.inPlayers.set(player.positionName, player);
+  }
+  public clear(): void {
+    this.inPlayers.clear();
+    this.amount = 0;
   }
 }
 

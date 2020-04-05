@@ -24,6 +24,7 @@ class Player {
   public availableActions: PlayerAction[];
   public currentPot: number;
   public selfStack: number;
+  public isCurrentStage: boolean; // 是否是当前行动回合，比如 all in 或弃牌，有当前回合和之前回合之分
   public positionName: string;
   public positionName2?: string;
   /**
@@ -37,6 +38,7 @@ class Player {
     this.status = PlayerStatus.PENDING;
     this.availableActions = [];
     this.selfStack = this.options.buyIn;
+    this.isCurrentStage = true;
   }
   public setStatus(status: PlayerStatus): void {
     this.status = status;

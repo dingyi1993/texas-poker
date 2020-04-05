@@ -96,6 +96,9 @@ describe('#翻前', () => {
   });
   it('side pot', () => {
     // 计算边池
+    expect(game.pot.mainPot.amount).to.equal(200 + 200 + 2 + 2 + 200 + 200);
+    expect(game.pot.sidePot.length).to.equal(1);
+    expect(game.pot.sidePot[0].amount).to.equal(200 + 200);
   });
   it('进入下一轮', () => {
     // 当没有all in的玩家下注量相等时，则进入下一轮

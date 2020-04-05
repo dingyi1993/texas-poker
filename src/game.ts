@@ -24,7 +24,7 @@ class Game {
 
   public options: GameOptions;
   public players: Player[];
-  public allInPlayers: Player[];
+  public allInPlayers: Player[]; // 看能不能去掉
   public pot: {
     mainPot: Pot;
     sidePot: Pot[];
@@ -75,6 +75,43 @@ class Game {
     const actionChain = createDoubleLink<Player>(this.players);
     this.actionChain = actionChain;
   }
+  private calSidePot(): void {
+    // all in 几家，就是几个边池，如果恰好有 2 个或以上玩家 all in 金额相同，则边池数量要减多出来一样玩家的个数
+    // 最后一个边池，作为下一轮的主池
+    // 在玩的玩家按照 all in 金额从小到大计算边池
+    const currentPlayers = this.players.filter(player => player.isCurrentStage);
+    const allInPlayers = currentPlayers
+      .filter(player => player.isAllIn())
+      .sort((a, b) => a.currentPot - b.currentPot);
+    // 这里的 case 就是有 2 个或以上玩家 all in 金额相同，第一次已经把后面 all in 玩家的当前池子减为 0 了，所以这里要判空
+    if (allInPlayers.length === 0) return;
+    const currentMainPot = this.pot.mainPot;
+    currentMainPot.clear();
+    allInPlayers.forEach((allInPlayer, index) => {
+      const allInPlayerCurrentPot = allInPlayer.currentPot;
+      if (allInPlayerCurrentPot === 0) return;
+      const currentPot = index === 0 ? currentMainPot : new Pot();
+      currentPlayers.forEach(player => {
+        if (player.currentPot < allInPlayerCurrentPot) {
+          currentPot.putAmount(player.currentPot, player);
+          player.currentPot = 0;
+        } else {
+          currentPot.putAmount(allInPlayerCurrentPot, player);
+          player.currentPot -= allInPlayerCurrentPot;
+        }
+      });
+      if (index !== 0) {
+        this.pot.sidePot.push(currentPot);
+      }
+    });
+    const lastPot = new Pot();
+    currentPlayers.forEach(player => {
+      if (player.currentPot === 0) return;
+      lastPot.putAmount(player.currentPot, player);
+      player.currentPot = 0;
+    });
+    this.pot.sidePot.push(lastPot);
+  }
   public getSbPlayerNode(): PlayerNode {
     return this.actionChain.next;
   }
@@ -101,8 +138,12 @@ class Game {
         throw new Error('代码出问题了，不该出现的死循环');
       }
     }
+    // 下一个在游戏中的玩家，当前尺子大于等于上一个入池的玩家，则代表当前阶段结束
     if (findNextPlayingNode.data.currentPot >= this.lastInPlayerNode.data.currentPot) {
       // 当前阶段结束
+      // 计算边池
+      this.calSidePot();
+      // TODO 更新玩家状态，当前 all in => 之前 all in
       const nextStageFirstPlayerNode = this.stage.next();
       this.currentPlayerNode = nextStageFirstPlayerNode;
       this.prevPlayerNode = null;
