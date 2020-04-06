@@ -19,8 +19,8 @@ class Game {
   private stage: Stage;
   private actionChain: PlayerNode;
   private currentPlayerNode: PlayerNode;
-  private prevPlayerNode: PlayerNode | null;
-  private lastInPlayerNode: PlayerNode;
+  private prevPlayerNode: PlayerNode | null; // 这个是上一个行动的玩家
+  private lastInPlayerNode: PlayerNode; // 这个是上一个入池的玩家，不同于 prevPlayerNode，可能上一个行动的并不是入池的，比如 check、fold
 
   public options: GameOptions;
   public players: Player[];
@@ -83,12 +83,12 @@ class Game {
     const allInPlayers = currentPlayers
       .filter(player => player.isAllIn())
       .sort((a, b) => a.currentPot - b.currentPot);
-    // 这里的 case 就是有 2 个或以上玩家 all in 金额相同，第一次已经把后面 all in 玩家的当前池子减为 0 了，所以这里要判空
     if (allInPlayers.length === 0) return;
     const currentMainPot = this.pot.mainPot;
     currentMainPot.clear();
     allInPlayers.forEach((allInPlayer, index) => {
       const allInPlayerCurrentPot = allInPlayer.currentPot;
+      // 这里的 case 就是有 2 个或以上玩家 all in 金额相同，第一次已经把后面 all in 玩家的当前池子减为 0 了，所以这里要判空
       if (allInPlayerCurrentPot === 0) return;
       const currentPot = index === 0 ? currentMainPot : new Pot();
       currentPlayers.forEach(player => {
@@ -138,12 +138,18 @@ class Game {
         throw new Error('代码出问题了，不该出现的死循环');
       }
     }
-    // 下一个在游戏中的玩家，当前尺子大于等于上一个入池的玩家，则代表当前阶段结束
-    if (findNextPlayingNode.data.currentPot >= this.lastInPlayerNode.data.currentPot) {
+    // 下一个在游戏中的玩家，当前池子大于等于上一个入池的玩家，则代表当前阶段结束
+    const flag = this.getStage().getCurrentStage() === GameStage.PRE_FLOP && findNextPlayingNode.data.isBigBlind() && !findNextPlayingNode.data.hasDoneAction;
+    if (findNextPlayingNode.data.currentPot >= this.lastInPlayerNode.data.currentPot && !flag) {
       // 当前阶段结束
       // 计算边池
       this.calSidePot();
-      // TODO 更新玩家状态，当前 all in => 之前 all in
+      // 更新玩家状态，当前 all in / fold => 之前 all in / fold
+      this.players.forEach(player => {
+        if (player.isCurrentStage && (player.isAllIn() || player.isFold())) {
+          player.setIsCurrentStage(false);
+        }
+      });
       const nextStageFirstPlayerNode = this.stage.next();
       this.currentPlayerNode = nextStageFirstPlayerNode;
       this.prevPlayerNode = null;

@@ -39,6 +39,7 @@ class Stage {
       case GameStage.PRE_FLOP:
         this.current = GameStage.FLOP;
         let tmpPlayerNode = this.game.getSbPlayerNode();
+        // TODO 这里判断逻辑不对
         while (tmpPlayerNode.data.selfStack === 0) {
           tmpPlayerNode = tmpPlayerNode.next;
         }

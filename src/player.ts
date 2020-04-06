@@ -1,4 +1,5 @@
 import { Game, PlayerNode } from "./game";
+import { GameStage } from "./stage";
 
 // const PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO', '+N'];
 // const REQUIRED_PLAYER_TYPE = ['BTN', 'SB', 'BB', 'UTG'];
@@ -27,6 +28,7 @@ class Player {
   public isCurrentStage: boolean; // 是否是当前行动回合，比如 all in 或弃牌，有当前回合和之前回合之分
   public positionName: string;
   public positionName2?: string;
+  public hasDoneAction: boolean;
   /**
    *
    * @param game 游戏实例
@@ -39,6 +41,10 @@ class Player {
     this.availableActions = [];
     this.selfStack = this.options.buyIn;
     this.isCurrentStage = true;
+    this.hasDoneAction = false;
+  }
+  public isBigBlind(): boolean {
+    return this.positionName === 'BB' || this.positionName2 === 'BB';
   }
   public setStatus(status: PlayerStatus): void {
     this.status = status;
@@ -82,15 +88,25 @@ class Player {
   public isAllIn(): boolean {
     return this.status === PlayerStatus.ALL_IN;
   }
+  public isFold(): boolean {
+    return this.status === PlayerStatus.FOLD;
+  }
+  public setIsCurrentStage(isCurrentStage: boolean): void {
+    this.isCurrentStage = isCurrentStage;
+  }
   // TODO 这两个参数都能优化
   public calAvailableActions(currentPlayerNode: PlayerNode, prevPlayerNode: PlayerNode): void {
+    const prevPlayer = prevPlayerNode.data;
+    let canCheck = false;
+    if (this.game.getStage().getCurrentStage() === GameStage.PRE_FLOP && this.isBigBlind() && !this.hasDoneAction && this.currentPot === prevPlayer.currentPot) {
+      canCheck = true;
+    }
     // TODO 这里还需要计算上家弃牌或者 all in 的 case
     const availableActions: PlayerAction[] = [];
-    const prevPlayer = prevPlayerNode.data;
     if (this.selfStack + this.currentPot > prevPlayer.currentPot * 2) {
-      availableActions.push('all in', 'raise', 'call');
+      availableActions.push('all in', 'raise', canCheck ? 'check' : 'call');
     } else if (this.selfStack + this.currentPot > prevPlayer.currentPot) {
-      availableActions.push('all in', 'call');
+      availableActions.push('all in', canCheck ? 'check' : 'call');
     } else {
       availableActions.push('all in');
     }
@@ -108,6 +124,7 @@ class Player {
       this.game.addAllInPlayer(this);
       this.game.pot.mainPot.putAmount(amount, this);
       this.status = PlayerStatus.ALL_IN;
+      this.hasDoneAction = true;
       this.game.setLastInPlayerNode(this.game.getCurrentPlayerNode());
       return this.game.goNextPlayer();
     } else {
@@ -124,6 +141,7 @@ class Player {
       const amount = prevPlayer.currentPot - this.currentPot;
       this.currentPot = prevPlayer.currentPot;
       this.selfStack -= amount;
+      this.hasDoneAction = true;
       this.game.setLastInPlayerNode(this.game.getCurrentPlayerNode());
       this.game.pot.mainPot.putAmount(amount, this);
       return this.game.goNextPlayer();
@@ -152,6 +170,7 @@ class Player {
       const addAmount = amount - this.currentPot;
       this.currentPot = amount;
       this.selfStack -= addAmount;
+      this.hasDoneAction = true;
       this.game.pot.mainPot.putAmount(addAmount, this);
       // if (sidePotAmount && this.game.allInPlayers.length > this.game.pot.sidePot.length) {
       //   const sidePot = this.game.makeSidePot();
@@ -165,6 +184,7 @@ class Player {
   }
   public check(): PlayerNode {
     if (this.availableActions.indexOf('check') > -1) {
+      this.hasDoneAction = true;
       return this.game.goNextPlayer();
     } else {
       throw new Error('不合法的行动');
@@ -172,6 +192,7 @@ class Player {
   }
   public fold(): PlayerNode {
     this.status = PlayerStatus.FOLD;
+    this.hasDoneAction = true;
     return this.game.goNextPlayer();
   }
 
